@@ -406,6 +406,86 @@ extension TerminalView {
         }
         return nsattr
     }
+
+    private func contrastCorrectedColors(
+        foregroundColor: TTColor,
+        backgroundColor: TTColor,
+        underlineColor: TTColor?,
+        foregroundAttribute: Attribute.Color,
+        backgroundAttribute: Attribute.Color,
+        underlineAttribute: Attribute.Color?,
+        originalAttribute: Attribute,
+        isInverse: Bool
+    ) -> (foreground: TTColor, background: TTColor, underline: TTColor?) {
+        guard let foreground = srgbColor(from: foregroundColor),
+              let background = srgbColor(from: backgroundColor) else {
+            return (foregroundColor, backgroundColor, underlineColor)
+        }
+
+        let backgroundRole = contrastCorrection.backgroundRole(
+            originalAttribute: originalAttribute,
+            resolvedBackgroundAttribute: backgroundAttribute,
+            resolvedBackground: background
+        )
+        guard let correctedPair = contrastCorrection.correctedPair(
+                foreground: foreground,
+                background: background,
+                underline: underlineColor.flatMap { srgbColor(from: $0) },
+                hasExplicitForeground: isExplicitColor(foregroundAttribute),
+                hasExplicitUnderline: underlineAttribute.map(isExplicitColor) ?? false,
+                backgroundRole: backgroundRole,
+                isInverse: isInverse
+              ) else {
+            return (foregroundColor, backgroundColor, underlineColor)
+        }
+
+        return (
+            makeTTColor(correctedPair.foreground),
+            makeTTColor(correctedPair.background),
+            correctedPair.underline.map(makeTTColor)
+        )
+    }
+
+    private func isExplicitColor(_ color: Attribute.Color) -> Bool {
+        switch color {
+        case .ansi256, .trueColor:
+            return true
+        case .defaultColor, .defaultInvertedColor:
+            return false
+        }
+    }
+
+    private func makeTTColor(_ color: TerminalSRGBColor) -> TTColor {
+        TTColor.make(
+            red: CGFloat(color.red),
+            green: CGFloat(color.green),
+            blue: CGFloat(color.blue),
+            alpha: 1.0
+        )
+    }
+
+    private func srgbColor(from color: TTColor) -> TerminalSRGBColor? {
+        #if os(macOS)
+        guard let color = color.usingColorSpace(.deviceRGB) else {
+            return nil
+        }
+        var red: CGFloat = 0.0
+        var green: CGFloat = 0.0
+        var blue: CGFloat = 0.0
+        var alpha: CGFloat = 1.0
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        return TerminalSRGBColor(red: Double(red), green: Double(green), blue: Double(blue))
+        #else
+        var red: CGFloat = 0.0
+        var green: CGFloat = 0.0
+        var blue: CGFloat = 0.0
+        var alpha: CGFloat = 1.0
+        guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return nil
+        }
+        return TerminalSRGBColor(red: Double(red), green: Double(green), blue: Double(blue))
+        #endif
+    }
     
     //
     // Given a vt100 attribute, return the NSAttributedString attributes used to render it
@@ -452,22 +532,35 @@ extension TerminalView {
         }
         
         var fgColor = mapColor (color: fg, isFg: true, isBold: isBold, useBrightColors: useBrightColors)
-        let bgColor = mapColor (color: bg, isFg: false, isBold: false)
+        var bgColor = mapColor (color: bg, isFg: false, isBold: false)
         // Apply dim/faint attribute (SGR 2)
         if flags.contains (.dim) {
             fgColor = fgColor.dimmedColor (towards: bgColor)
         }
+        let mappedUnderlineColor = attribute.underlineColor.map {
+            mapColor(color: $0, isFg: true, isBold: isBold, useBrightColors: useBrightColors)
+        }
+        let correctedColors = contrastCorrectedColors(
+            foregroundColor: fgColor,
+            backgroundColor: bgColor,
+            underlineColor: mappedUnderlineColor,
+            foregroundAttribute: fg,
+            backgroundAttribute: bg,
+            underlineAttribute: attribute.underlineColor,
+            originalAttribute: attribute,
+            isInverse: flags.contains(.inverse)
+        )
+        fgColor = correctedColors.foreground
+        bgColor = correctedColors.background
+        let underlineColor = correctedColors.underline
         var nsattr: [NSAttributedString.Key:Any] = [
             .font: tf,
             .foregroundColor: fgColor,
             .backgroundColor: bgColor
         ]
         if flags.contains (.underline) {
-            let underlineColor = attribute.underlineColor.map {
-                mapColor(color: $0, isFg: true, isBold: isBold, useBrightColors: useBrightColors)
-            } ?? fgColor
             let underlineVariant = attribute.underlineStyle == .none ? .single : attribute.underlineStyle
-            nsattr [.underlineColor] = underlineColor
+            nsattr [.underlineColor] = underlineColor ?? fgColor
             nsattr [.underlineStyle] = nsUnderlineStyle(underlineVariant).rawValue
             nsattr [SwiftTermUnderlineStyleKey] = Int(underlineVariant.rawValue)
         }

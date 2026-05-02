@@ -608,6 +608,15 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         }
     }
 
+    public var contrastCorrection: TerminalContrastCorrection = .disabled {
+        didSet {
+            guard oldValue != contrastCorrection, terminal != nil else {
+                return
+            }
+            colorsChanged()
+        }
+    }
+
     var linkHighlightRange: [Terminal.LinkMatch.RowRange]?
 
     /**

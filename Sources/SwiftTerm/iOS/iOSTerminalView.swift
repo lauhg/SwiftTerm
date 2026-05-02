@@ -155,6 +155,15 @@ open class TerminalView: UIScrollView, UITextInputTraits, UIKeyInput, UIScrollVi
         }
     }
 
+    public var contrastCorrection: TerminalContrastCorrection = .disabled {
+        didSet {
+            guard oldValue != contrastCorrection, terminal != nil else {
+                return
+            }
+            colorsChanged()
+        }
+    }
+
     private var lastReportedLink: String?
     var commandActive = false
     private var activeCommandKeys: Set<UIKeyboardHIDUsage> = []
