@@ -288,6 +288,7 @@ extension TerminalView {
     // Clears the cached state for colors and triggers a full display
     func colorsChanged ()
     {
+        colorRenderGeneration &+= 1
         urlAttributes = [:]
         attributes = [:]
         

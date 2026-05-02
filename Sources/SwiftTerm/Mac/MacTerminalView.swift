@@ -113,6 +113,7 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     private var findBarOptions: SearchOptions = SearchOptions()
     var debug: TerminalDebugView?
     var pendingDisplay: Bool = false
+    var colorRenderGeneration: UInt64 = 0
 #if canImport(MetalKit)
     var metalView: MTKView?
     var metalRenderer: MetalTerminalRenderer?

@@ -172,6 +172,7 @@ struct CacheSignature: Hashable {
     let fontSize: Double
     let isAltBuffer: Bool
     let kittyStamp: KittyCacheStamp
+    let colorRenderGeneration: UInt64
 }
 
 final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
@@ -603,7 +604,8 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                                        fontName: terminalView.fontSet.normal.fontName,
                                        fontSize: Double(terminalView.fontSet.normal.pointSize),
                                        isAltBuffer: terminalView.terminal.isCurrentBufferAlternate,
-                                       kittyStamp: kittyStamp)
+                                       kittyStamp: kittyStamp,
+                                       colorRenderGeneration: terminalView.colorRenderGeneration)
         let signatureChanged = signature != cacheSignature
         if signatureChanged {
             rowCache.removeAll()

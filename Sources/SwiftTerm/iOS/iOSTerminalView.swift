@@ -200,6 +200,7 @@ open class TerminalView: UIScrollView, UITextInputTraits, UIKeyInput, UIScrollVi
     var search: SearchService!
     var debug: UIView?
     var pendingDisplay: Bool = false
+    var colorRenderGeneration: UInt64 = 0
 #if canImport(MetalKit)
     var metalView: MTKView?
     var metalRenderer: MetalTerminalRenderer?
