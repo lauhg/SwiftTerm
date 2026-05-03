@@ -1025,17 +1025,6 @@ open class TerminalView: UIScrollView, UITextInputTraits, UIKeyInput, UIScrollVi
         
         let singleTap = UITapGestureRecognizer (target: self, action: #selector(singleTap(_:)))
         addGestureRecognizer(singleTap)
-        
-        let doubleTap = UITapGestureRecognizer (target: self, action: #selector(doubleTap(_:)))
-        doubleTap.numberOfTapsRequired = 2
-        addGestureRecognizer(doubleTap)
-
-        let tripleTap = UITapGestureRecognizer (target: self, action: #selector(tripleTap(_:)))
-        tripleTap.numberOfTapsRequired = 3
-        addGestureRecognizer(tripleTap)
-
-        singleTap.require(toFail: doubleTap)
-        doubleTap.require(toFail: tripleTap)
     }
 
     func setupLinkReportingInteractions ()
