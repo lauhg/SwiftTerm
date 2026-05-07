@@ -271,6 +271,32 @@ public protocol TerminalImage {
     var col: Int { get set }
 }
 
+/// Summary of occupied rows at the bottom of the terminal's currently displayed buffer.
+public struct TerminalVisibleBottomOccupancy: Equatable {
+    public let rows: Int
+    public let cursorRow: Int
+    public let lastContentRow: Int?
+    public let lastOccupiedRow: Int?
+    public let bottomBlankRows: Int
+    public let isAlternateBuffer: Bool
+
+    public init(
+        rows: Int,
+        cursorRow: Int,
+        lastContentRow: Int?,
+        lastOccupiedRow: Int?,
+        bottomBlankRows: Int,
+        isAlternateBuffer: Bool
+    ) {
+        self.rows = rows
+        self.cursorRow = cursorRow
+        self.lastContentRow = lastContentRow
+        self.lastOccupiedRow = lastOccupiedRow
+        self.bottomBlankRows = bottomBlankRows
+        self.isAlternateBuffer = isAlternateBuffer
+    }
+}
+
 /**
  * The `Terminal` class provides the terminal emulation engine, and can be used to feed data to the
  * terminal emulator.   Typically users will intereact with a higher-level implementation that provides a
@@ -645,6 +671,65 @@ open class Terminal {
     public func getDims () -> (cols: Int,rows: Int)
     {
         return (cols, rows)
+    }
+
+    /// Returns bottom-row occupancy information for the buffer currently used for display.
+    public func visibleBottomOccupancy(
+        countStyledCellsAsContent: Bool = true,
+        includeCursor: Bool = true
+    ) -> TerminalVisibleBottomOccupancy {
+        let buffer = displayBuffer
+        let visibleRows = max(0, buffer.rows)
+        guard visibleRows > 0 else {
+            return TerminalVisibleBottomOccupancy(
+                rows: 0,
+                cursorRow: 0,
+                lastContentRow: nil,
+                lastOccupiedRow: nil,
+                bottomBlankRows: 0,
+                isAlternateBuffer: isDisplayBufferAlternate
+            )
+        }
+
+        let cursorRow = min(max(buffer.y, 0), visibleRows - 1)
+        var lastContentRow: Int?
+
+        for row in stride(from: visibleRows - 1, through: 0, by: -1) {
+            let lineIndex = buffer.yDisp + row
+            guard lineIndex >= 0, lineIndex < buffer.lines.count else {
+                continue
+            }
+
+            let line = buffer.lines[lineIndex]
+            let lineHasVisualContent = line.images?.isEmpty == false ||
+                (countStyledCellsAsContent ? line.hasAnyContent() : line.getTrimmedLength() > 0)
+            if lineHasVisualContent {
+                lastContentRow = row
+                break
+            }
+        }
+
+        var lastOccupiedRow = lastContentRow
+        if includeCursor {
+            lastOccupiedRow = max(lastOccupiedRow ?? cursorRow, cursorRow)
+        }
+
+        let bottomBlankRows: Int
+        if let lastOccupiedRow {
+            let clampedLastOccupiedRow = min(max(lastOccupiedRow, 0), visibleRows - 1)
+            bottomBlankRows = max(0, visibleRows - 1 - clampedLastOccupiedRow)
+        } else {
+            bottomBlankRows = visibleRows
+        }
+
+        return TerminalVisibleBottomOccupancy(
+            rows: visibleRows,
+            cursorRow: cursorRow,
+            lastContentRow: lastContentRow,
+            lastOccupiedRow: lastOccupiedRow,
+            bottomBlankRows: bottomBlankRows,
+            isAlternateBuffer: isDisplayBufferAlternate
+        )
     }
     
     public init (delegate: TerminalDelegate, options: TerminalOptions = TerminalOptions.default)
